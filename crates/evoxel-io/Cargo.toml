@@ -1,0 +1,23 @@
+[package]
+name = "evoxel-io"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "IO related logic for the evoxel library"
+
+
+[dependencies]
+evoxel-core = { version = "0.0.1-alpha.1", path = "../evoxel-core", registry = "custom" }
+
+ecoord = { workspace = true }
+
+thiserror = { workspace = true }
+chrono = { workspace = true }
+polars = { workspace = true, features = ["lazy", "csv-file", "parquet", "ndarray"] }
+ndarray = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
