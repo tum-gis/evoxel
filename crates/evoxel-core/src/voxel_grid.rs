@@ -1,88 +1,152 @@
+use crate::error::Error;
+use crate::info::VoxelGridInfo;
 use chrono::{DateTime, Utc};
 use ecoord::{FrameId, ReferenceFrames, TransformId};
 use nalgebra::Point3;
-use polars::datatypes::DataType;
-use polars::prelude::{DataFrame, TakeRandom};
+
+use crate::data_frame_utils;
+use polars::prelude::DataFrame;
 use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct VoxelGrid {
-    pub data: DataFrame,
-    pub info: VoxelGridInfo,
-    pub frames: ReferenceFrames,
+    pub(crate) voxel_data: DataFrame,
+    pub(crate) info: VoxelGridInfo,
+    pub(crate) reference_frames: ReferenceFrames,
 }
 
 impl VoxelGrid {
-    pub fn new(data: DataFrame, info: VoxelGridInfo, frames: ReferenceFrames) -> Self {
-        let column_names = data.get_column_names();
-        assert_eq!(column_names[0], "x");
-        assert_eq!(column_names[1], "y");
-        assert_eq!(column_names[2], "z");
+    pub fn new(
+        voxel_data: DataFrame,
+        info: VoxelGridInfo,
+        reference_frames: ReferenceFrames,
+    ) -> Result<Self, Error> {
+        data_frame_utils::check_data_integrity(&voxel_data, &info, &reference_frames)?;
 
-        let data_types = data.dtypes();
-        assert_eq!(data_types[0], DataType::Int64);
-        assert_eq!(data_types[1], DataType::Int64);
-        assert_eq!(data_types[2], DataType::Int64);
+        Ok(Self {
+            voxel_data,
+            info,
+            reference_frames,
+        })
+    }
 
-        Self { data, info, frames }
+    pub fn from_data_frame(
+        voxel_data: DataFrame,
+        info: VoxelGridInfo,
+        reference_frames: ReferenceFrames,
+    ) -> Result<Self, Error> {
+        /*assert!(
+            frames.contains_frame(&info.frame_id),
+            "Reference frames must contain frame id '{}' of point cloud data.",
+            info.frame_id
+        );*/
+
+        data_frame_utils::check_data_integrity(&voxel_data, &info, &reference_frames)?;
+        Ok(Self {
+            voxel_data,
+            info,
+            reference_frames,
+        })
+    }
+
+    pub fn voxel_data(&self) -> &DataFrame {
+        &self.voxel_data
+    }
+
+    pub fn info(&self) -> &VoxelGridInfo {
+        &self.info
+    }
+    pub fn reference_frames(&self) -> &ReferenceFrames {
+        &self.reference_frames
+    }
+    pub fn set_reference_frames(&mut self, reference_frames: ReferenceFrames) {
+        self.reference_frames = reference_frames;
     }
 
     pub fn size(&self) -> usize {
-        self.data.height()
+        self.voxel_data.height()
     }
 
     pub fn min_index(&self) -> Point3<i64> {
-        let selected_df_row = self.data.min();
-        let index_x: i64 = selected_df_row
-            .column(DataFrameColumnNames::X.as_str())
+        let index_x: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::X.as_str())
             .unwrap()
-            .i64()
+            .min()
             .unwrap()
-            .get(0)
             .unwrap();
-        let index_y: i64 = selected_df_row
-            .column(DataFrameColumnNames::Y.as_str())
+        let index_y: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::Y.as_str())
             .unwrap()
-            .i64()
+            .min()
             .unwrap()
-            .get(0)
             .unwrap();
-        let index_z: i64 = selected_df_row
-            .column(DataFrameColumnNames::Z.as_str())
+        let index_z: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::Z.as_str())
             .unwrap()
-            .i64()
+            .min()
             .unwrap()
-            .get(0)
             .unwrap();
 
         Point3::new(index_x, index_y, index_z)
     }
 
+    pub fn min_local_center_point(&self) -> Point3<f64> {
+        let min_index = self.min_index();
+        Point3::new(min_index.x as f64, min_index.y as f64, min_index.z as f64)
+            * self.info.resolution
+    }
+
+    pub fn min_center_point(&self, frame_id: FrameId) -> Result<Point3<f64>, Error> {
+        let min_point = self.min_local_center_point();
+        let isometry_graph = self.reference_frames.derive_transform_graph(&None, &None)?;
+        let transform_id = TransformId::new(frame_id, self.info.frame_id.clone());
+        let isometry = isometry_graph.get_isometry(&transform_id)?;
+
+        Ok(isometry * min_point)
+    }
+
     pub fn max_index(&self) -> Point3<i64> {
-        let selected_df_row = self.data.max();
-        let index_x: i64 = selected_df_row
-            .column(DataFrameColumnNames::X.as_str())
+        let index_x: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::X.as_str())
             .unwrap()
-            .i64()
+            .max()
             .unwrap()
-            .get(0)
             .unwrap();
-        let index_y: i64 = selected_df_row
-            .column(DataFrameColumnNames::Y.as_str())
+        let index_y: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::Y.as_str())
             .unwrap()
-            .i64()
+            .max()
             .unwrap()
-            .get(0)
             .unwrap();
-        let index_z: i64 = selected_df_row
-            .column(DataFrameColumnNames::Z.as_str())
+        let index_z: i64 = self
+            .voxel_data
+            .column(VoxelDataColumnNames::Z.as_str())
             .unwrap()
-            .i64()
+            .max()
             .unwrap()
-            .get(0)
             .unwrap();
 
         Point3::new(index_x, index_y, index_z)
+    }
+
+    pub fn max_local_center_point(&self) -> Point3<f64> {
+        let max_index = self.max_index();
+        Point3::new(max_index.x as f64, max_index.y as f64, max_index.z as f64)
+            * self.info.resolution
+    }
+
+    pub fn max_center_point(&self, frame_id: FrameId) -> Result<Point3<f64>, Error> {
+        let max_point = self.max_local_center_point();
+        let isometry_graph = self.reference_frames.derive_transform_graph(&None, &None)?;
+        let transform_id = TransformId::new(frame_id, self.info.frame_id.clone());
+        let isometry = isometry_graph.get_isometry(&transform_id)?;
+
+        Ok(isometry * max_point)
     }
 
     /// Returns all cell indices as a vector in the local coordinate frame.
@@ -90,25 +154,25 @@ impl VoxelGrid {
     ///
     pub fn get_all_cell_indices_in_local_frame(&self) -> Vec<Point3<i64>> {
         let x_series = self
-            .data
-            .column(DataFrameColumnNames::X.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::X.as_str())
             .unwrap()
             .i64()
             .unwrap();
         let y_series = self
-            .data
-            .column(DataFrameColumnNames::Y.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::Y.as_str())
             .unwrap()
             .i64()
             .unwrap();
         let z_series = self
-            .data
-            .column(DataFrameColumnNames::Z.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::Z.as_str())
             .unwrap()
             .i64()
             .unwrap();
 
-        let all_indices: Vec<Point3<i64>> = (0..self.size() as usize)
+        let all_indices: Vec<Point3<i64>> = (0..self.size())
             .into_par_iter()
             .map(|i: usize| {
                 Point3::new(
@@ -140,24 +204,24 @@ impl VoxelGrid {
 
     pub fn get_cell_index(&self, row_index: usize) -> Point3<i64> {
         let index_x: i64 = self
-            .data
-            .column(DataFrameColumnNames::X.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::X.as_str())
             .unwrap()
             .i64()
             .unwrap()
             .get(row_index)
             .unwrap();
         let index_y: i64 = self
-            .data
-            .column(DataFrameColumnNames::Y.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::Y.as_str())
             .unwrap()
             .i64()
             .unwrap()
             .get(row_index)
             .unwrap();
         let index_z: i64 = self
-            .data
-            .column(DataFrameColumnNames::Z.as_str())
+            .voxel_data
+            .column(VoxelDataColumnNames::Z.as_str())
             .unwrap()
             .i64()
             .unwrap()
@@ -171,7 +235,7 @@ impl VoxelGrid {
     ///
     pub fn get_local_frame_id(&self) -> FrameId {
         //let t: &Transformation = self.frames.transforms().get();
-        FrameId::from(self.info.frame_id.clone())
+        self.info.frame_id.clone()
     }
 
     pub fn get_local_center_point(&self, row_idx: usize) -> Point3<f64> {
@@ -188,72 +252,47 @@ impl VoxelGrid {
         row_idx: usize,
         frame_id: &FrameId,
         timestamp: DateTime<Utc>,
-    ) -> Point3<f64> {
+    ) -> Result<Point3<f64>, Error> {
         let local_center_point = self.get_local_center_point(row_idx);
 
         let transform_id = TransformId::new(frame_id.clone(), self.get_local_frame_id());
 
         let isometry = self
-            .frames
-            .derive_transform_graph(&None, &Some(timestamp))
-            .get_isometry(&transform_id);
+            .reference_frames
+            .derive_transform_graph(&None, &Some(timestamp))?
+            .get_isometry(&transform_id)?;
 
         // let isometry = self.pose.isometry();
-        isometry * local_center_point
+        Ok(isometry * local_center_point)
     }
 
     pub fn get_all_center_points(
         &self,
         frame_id: &FrameId,
         timestamp: DateTime<Utc>,
-    ) -> Vec<Point3<f64>> {
-        let a: Vec<Point3<f64>> = (0..self.size() as i64)
-            .into_iter()
+    ) -> Result<Vec<Point3<f64>>, Error> {
+        let center_points: Vec<Point3<f64>> = (0..self.size() as i64)
             .map(|i: i64| self.get_center_point(i as usize, frame_id, timestamp))
-            .collect();
-        a
+            .collect::<Result<Vec<_>, Error>>()?;
+        Ok(center_points)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct VoxelGridInfo {
-    pub frame_id: String,
-    pub resolution: f64,
-    pub start_time: DateTime<Utc>,
-    pub stop_time: DateTime<Utc>,
-    pub submap_index: i32,
-}
-
-impl VoxelGridInfo {
-    pub fn new(
-        frame_id: String,
-        resolution: f64,
-        start_time: DateTime<Utc>,
-        stop_time: DateTime<Utc>,
-        submap_index: i32,
-    ) -> Self {
-        Self {
-            frame_id,
-            resolution,
-            start_time,
-            stop_time,
-            submap_index,
-        }
-    }
-}
-
-enum DataFrameColumnNames {
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum VoxelDataColumnNames {
     X,
     Y,
     Z,
+    Count,
 }
 
-impl DataFrameColumnNames {
-    fn as_str(&self) -> &'static str {
+impl VoxelDataColumnNames {
+    pub fn as_str(&self) -> &'static str {
         match self {
-            DataFrameColumnNames::X => "x",
-            DataFrameColumnNames::Y => "y",
-            DataFrameColumnNames::Z => "z",
+            VoxelDataColumnNames::X => "x",
+            VoxelDataColumnNames::Y => "y",
+            VoxelDataColumnNames::Z => "z",
+            VoxelDataColumnNames::Count => "count",
         }
     }
 }

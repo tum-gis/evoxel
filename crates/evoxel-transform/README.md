@@ -1,6 +1,6 @@
-# evoxel
+# evoxel-transform
 
-A Rust library for processing 3D voxel grids.
+Supplementary operations for processing 3D voxel grids.
 
 > [!WARNING]  
 > The library is at an early stage of development.

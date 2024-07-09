@@ -1,6 +1,6 @@
-# evoxel
+# evoxel-io
 
-A Rust library for processing 3D voxel grids.
+IO operations for processing 3D voxel grids.
 
 > [!WARNING]  
 > The library is at an early stage of development.

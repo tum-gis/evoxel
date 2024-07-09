@@ -1,6 +1,6 @@
-# evoxel
+# evoxel-cli
 
-A Rust library for processing 3D voxel grids.
+CLI tool for processing 3D voxel grids.
 
 > [!WARNING]  
 > The library is at an early stage of development.

@@ -5,13 +5,14 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core of the evoxel library"
+description = "Core primitives and operations for processing 3D voxel grids."
 
 
 [dependencies]
 ecoord = { workspace = true }
 
-polars = { workspace = true, features = ["lazy", "csv-file", "parquet", "ndarray", "rows"] }
+thiserror = { workspace = true }
+polars = { workspace = true, features = ["lazy", "parquet", "ndarray", "rows"] }
 ndarray = { workspace = true }
 rayon = { workspace = true }
 nalgebra = { workspace = true }

@@ -1,26 +1,23 @@
-use evoxel::io::EvoxelReader;
-use std::path::PathBuf;
-use std::time::Instant;
-use tracing::info;
+mod arguments;
+mod commands;
+
+use crate::arguments::{Arguments, Commands};
+use clap::Parser;
+use std::path::{Path, PathBuf};
 
 fn main() {
     tracing_subscriber::fmt::init();
-    info!("Hello, world!");
+    let arguments = Arguments::parse();
 
-    let path = PathBuf::from("/submap_0");
-    let start = Instant::now();
-    let voxel_grid = EvoxelReader::new(path).finish().unwrap();
-    let duration = start.elapsed();
-    info!(
-        "Read voxel grid with {} cells in {:?}.",
-        voxel_grid.size(),
-        duration
-    );
+    match &arguments.command {
+        Commands::Test {
+            input_directory_path,
+            output_directory_path,
+        } => {
+            let input_directory_path = Path::new(input_directory_path).canonicalize().unwrap();
+            let output_directory_path = PathBuf::from(output_directory_path);
 
-    info!("Start");
-    let start = Instant::now();
-    let c = voxel_grid.get_all_cell_indices_in_local_frame();
-    let duration = start.elapsed();
-    info!("Calculated {} points in {:?}.", c.len(), duration);
-    //let all = voxel_grid.get_all_center_points();
+            commands::test::run(input_directory_path, output_directory_path);
+        }
+    };
 }

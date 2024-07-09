@@ -1,16 +1,28 @@
 use chrono::{DateTime, TimeZone, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-pub struct VoxelGridInfoDocument {
-    pub frame_id: String,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvoxelInfoDocument {
     pub resolution: f64,
-    pub start_timestamp: TimeElement,
-    pub stop_timestamp: TimeElement,
-    pub submap_index: i32,
+    pub frame_id: String,
+    pub start_timestamp: Option<TimeElement>,
+    pub stop_timestamp: Option<TimeElement>,
+    pub submap_index: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+impl EvoxelInfoDocument {
+    pub fn new(frame_id: String, resolution: f64) -> Self {
+        Self {
+            frame_id,
+            resolution,
+            start_timestamp: None,
+            stop_timestamp: None,
+            submap_index: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeElement {
     sec: i64,
     nanosec: u32,
