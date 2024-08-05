@@ -5,11 +5,11 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "CLI tool for evoxel operations"
+description = "CLI tool for processing 3D voxel grids."
 
 
 [dependencies]
-evoxel = { version = "0.0.1-alpha.3", path = "../evoxel" }
+evoxel = { version = "0.0.1-alpha.4", path = "../evoxel" }
 
 clap = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
