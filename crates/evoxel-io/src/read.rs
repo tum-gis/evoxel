@@ -3,10 +3,11 @@ use crate::error::Error;
 use crate::{FILE_NAME_ECOORD, FILE_NAME_INFO, FILE_NAME_VOXEL_DATA_UNCOMPRESSED};
 use evoxel_core::VoxelGridInfo;
 use evoxel_core::voxel_grid::VoxelGrid;
-use polars::prelude::LazyFileListReader;
 use polars::prelude::{LazyCsvReader, all};
+use polars::prelude::{LazyFileListReader, PlPath};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// `EvoxelReader` sets up a reader for the custom reader data structure.
 ///
@@ -27,10 +28,11 @@ impl EvoxelReader {
         // assert!(self.path.exists(), "Path must exist.");
 
         let voxel_grid_data_path = self.path.join(FILE_NAME_VOXEL_DATA_UNCOMPRESSED);
-        let df = LazyCsvReader::new(voxel_grid_data_path)
+        let voxel_grid_data_polars_path: PlPath = PlPath::Local(Arc::from(voxel_grid_data_path));
+        let df = LazyCsvReader::new(voxel_grid_data_polars_path)
             .with_separator(b' ')
             .finish()?
-            .select([all()])
+            .select([all().as_expr()])
             .collect()?;
 
         // let vg = VoxelGrid

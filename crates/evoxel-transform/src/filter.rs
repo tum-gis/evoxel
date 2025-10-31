@@ -1,11 +1,11 @@
 use crate::Error;
 use evoxel_core::{VoxelDataColumnType, VoxelGrid};
 use nalgebra::Point3;
-
+use polars::datatypes::PlSmallStr;
 use polars::frame::DataFrame;
 
 use crate::Error::LowerCornerMustBeBelowUpperCorner;
-use polars::prelude::{ChunkCompareIneq, IntoLazy, all, col, len};
+use polars::prelude::{ChunkCompareIneq, IntoLazy, Selector, all, col, len};
 
 pub fn aggregate_by_index(voxel_grid: &VoxelGrid) -> Result<VoxelGrid, Error> {
     let voxel_data = voxel_grid.voxel_data();
@@ -19,7 +19,7 @@ pub fn aggregate_by_index(voxel_grid: &VoxelGrid) -> Result<VoxelGrid, Error> {
         .clone()
         .lazy()
         .group_by(partition_columns)
-        .agg([all(), len()])
+        .agg([all().as_expr(), len()])
         //.limit(5)
         .collect()?;
     //dbg!("{:?}", &partitioned);
@@ -59,7 +59,10 @@ pub fn explode(voxel_grid: &VoxelGrid) -> Result<VoxelGrid, Error> {
     let df: DataFrame = voxel_data
         .clone()
         .lazy()
-        .explode(column_names.into_iter().map(col).collect::<Vec<_>>())
+        .explode(Selector::ByName {
+            names: column_names.into_iter().map(PlSmallStr::from_str).collect(),
+            strict: false,
+        })
         //.limit(5)
         .collect()?;
 
